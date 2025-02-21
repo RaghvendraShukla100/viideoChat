@@ -4,8 +4,10 @@ import Peer from "simple-peer";
 
 const SocketContext = createContext();
 
-// const socket = io('http://localhost:5000');
-const socket = io("https://warm-wildwood-81069.herokuapp.com");
+// ✅ Force WebSocket transport to avoid CORS & polling issues
+const socket = io("https://video-chat-backend-3ccg.onrender.com", {
+  transports: ["websocket"],
+});
 
 const ContextProvider = ({ children }) => {
   const [callAccepted, setCallAccepted] = useState(false);
@@ -24,7 +26,6 @@ const ContextProvider = ({ children }) => {
       .getUserMedia({ video: true, audio: true })
       .then((currentStream) => {
         setStream(currentStream);
-
         myVideo.current.srcObject = currentStream;
       });
 
@@ -33,6 +34,11 @@ const ContextProvider = ({ children }) => {
     socket.on("callUser", ({ from, name: callerName, signal }) => {
       setCall({ isReceivingCall: true, from, name: callerName, signal });
     });
+
+    return () => {
+      socket.off("me");
+      socket.off("callUser");
+    };
   }, []);
 
   const answerCall = () => {
@@ -49,7 +55,6 @@ const ContextProvider = ({ children }) => {
     });
 
     peer.signal(call.signal);
-
     connectionRef.current = peer;
   };
 
@@ -71,7 +76,6 @@ const ContextProvider = ({ children }) => {
 
     socket.on("callAccepted", (signal) => {
       setCallAccepted(true);
-
       peer.signal(signal);
     });
 
@@ -80,9 +84,9 @@ const ContextProvider = ({ children }) => {
 
   const leaveCall = () => {
     setCallEnded(true);
-
-    connectionRef.current.destroy();
-
+    if (connectionRef.current) {
+      connectionRef.current.destroy();
+    }
     window.location.reload();
   };
 
